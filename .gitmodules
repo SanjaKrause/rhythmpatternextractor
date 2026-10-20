@@ -1,0 +1,7 @@
+[submodule "songformer"]
+	path = songformer
+	url = https://github.com/ASLP-lab/SongFormer.git
+	ignore = untracked
+[submodule "Beat-Transformer"]
+	path = Beat-Transformer
+	url = https://github.com/zhaojw1998/Beat-Transformer.git

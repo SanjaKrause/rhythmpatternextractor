@@ -1,0 +1,352 @@
+"""
+Configuration for Loop Extractor Pipeline.
+
+This module contains all configuration parameters for the loop extraction workflow.
+Loop extractor environment: loop_extractor_main
+Subprocess environment: new_beatnet_env (for Beat-Transformer only)
+"""
+
+import os
+from pathlib import Path
+from typing import Optional
+
+
+class Config:
+    """Main configuration class for Loop Extractor pipeline."""
+
+    # ============================================================================
+    # ENVIRONMENT SETTINGS
+    # ============================================================================
+
+    # Loop extractor environment (runs spleeter, analysis, everything except beat detection)
+    MAIN_ENV = "loop_extractor_main"
+
+    # Subprocess environment (for Beat-Transformer and Madmom onset detection)
+    BEAT_DETECTION_ENV = "new_beatnet_env"
+
+    # Path to the python executable of the beat-detection environment
+    # (used for both beat detection and madmom onset detection).
+    # Override via the BEAT_DETECTION_PYTHON environment variable; falls back
+    # to the conda env named above in the default miniforge/anaconda location.
+    BEAT_DETECTION_PYTHON = os.environ.get(
+        "BEAT_DETECTION_PYTHON",
+        str(Path.home() / "miniforge3" / "envs" / BEAT_DETECTION_ENV / "bin" / "python"),
+    )
+
+    # Madmom onset detection uses the same environment as beat detection
+    MADMOM_PYTHON = BEAT_DETECTION_PYTHON
+
+    # ============================================================================
+    # DIRECTORY PATHS
+    # ============================================================================
+
+    # Project root (the loop_extractor package directory)
+    PROJECT_ROOT = Path(__file__).resolve().parent
+
+    # Beat-Transformer model directory (next to the package, in the repo root)
+    BEAT_TRANSFORMER_DIR = PROJECT_ROOT.parent / "Beat-Transformer"
+    BEAT_TRANSFORMER_CHECKPOINT = BEAT_TRANSFORMER_DIR / "checkpoint" / "fold_4_trf_param.pt"
+    BEAT_TRANSFORMER_CODE = BEAT_TRANSFORMER_DIR / "code"
+
+    # Default input/output directories (within project)
+    DEFAULT_INPUT_DIR = PROJECT_ROOT / "input_wav"
+    DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "output_analysis"
+
+    # Optional overview CSV with per-track snippet offsets. Set the
+    # OVERVIEW_CSV environment variable to use one; ignored if the file is missing.
+    OVERVIEW_CSV = Path(os.environ.get("OVERVIEW_CSV", PROJECT_ROOT / "overview.csv"))
+
+    # ============================================================================
+    # STEP 1: STEM SEPARATION (Spleeter)
+    # ============================================================================
+
+    # Spleeter model
+    SPLEETER_MODEL = "spleeter:5stems"
+    SPLEETER_OUTPUT_CODEC = "wav"
+
+    # Mel-spectrogram parameters (for Beat-Transformer input)
+    MEL_SR = 44100              # Sample rate
+    MEL_N_FFT = 4096            # FFT window size
+    MEL_HOP_LENGTH = 1024       # STFT hop length
+    MEL_N_MELS = 128            # Number of mel bins
+    MEL_FMIN = 30               # Minimum frequency (Hz)
+    MEL_FMAX = 11000            # Maximum frequency (Hz)
+
+    # Stems order (drums first - used as reference for anchoring other stems)
+    STEMS = ["drums", "vocals", "bass", "piano", "other"]
+
+    # Stems to process for onset detection and downstream analysis
+    # Default: only drums. Set to STEMS to process all 5 stems.
+    ONSET_STEMS = ["drums"]
+
+    # ============================================================================
+    # STEP 2: BEAT DETECTION (Beat-Transformer)
+    # ============================================================================
+
+    # Beat-Transformer model parameters
+    BT_ATTN_LEN = 5
+    BT_INSTR = 5                # 5 stems
+    BT_NTOKEN = 2               # beat, downbeat
+    BT_DMODEL = 256
+    BT_NHEAD = 8
+    BT_D_HID = 1024
+    BT_NLAYERS = 9
+    BT_NORM_FIRST = True
+    BT_FOLD = 4                 # Which checkpoint fold to use
+
+    # Madmom DBN parameters
+    DBN_MIN_BPM = 55.0
+    DBN_MAX_BPM = 215.0
+    DBN_FPS = MEL_SR / MEL_HOP_LENGTH  # ~43.066 Hz
+    DBN_TRANSITION_LAMBDA = 100
+    DBN_OBSERVATION_LAMBDA = 6
+    DBN_THRESHOLD = 0.2
+    DBN_BEATS_PER_BAR = [3, 4]  # Support 3/4 and 4/4 time signatures
+
+    # ============================================================================
+    # STEP 3: CORRECT BARS
+    # ============================================================================
+
+    # Correction algorithm parameters
+    CORRECT_BARS_OUTLIER_PERCENT = 10.0      # ±10% tolerance for usable tempo
+    CORRECT_BARS_MULT_MATCH_TOL = 0.10       # 10% tolerance for factor-of-two matching
+    CORRECT_BARS_BPM_THRESHOLD = 135.0       # BPM threshold for dominant tempo adjustment
+    CORRECT_BARS_DOUBLE_BPM_ADJUSTED = True  # Enable BPM threshold adjustment
+    CORRECT_BARS_SNIPPET_DURATION_S = 30.0   # Duration for snippet visualization
+
+    # ============================================================================
+    # STEP 4: RASTER/GRID CALCULATIONS
+    # ============================================================================
+
+    # Grid parameters
+    GRID_POSITIONS_PER_BAR = 16  # 16th note grid
+
+    # ============================================================================
+    # STEP 6.1: SECTION ANCHORING
+    # ============================================================================
+
+    # Tolerance for finding the nearest bar to a section boundary
+    # 0.5 = exactly in the middle between two downbeats (half a bar duration)
+    ANCHOR_BAR_TOLERANCE = 0.5
+
+    # Output folder name for anchoring results
+    ANCHORING_OUTPUT_FOLDER = '6.1_anchoring'
+
+    # Anchoring mode: 'single' or 'double'
+    # - 'single': Anchor grid to loop START only (original method)
+    # - 'double': Anchor grid to both loop START and END (interpolated correction)
+    ANCHORING_MODE = 'double'
+
+    # ============================================================================
+    # STEP 6.2: FILTER ANCHORED PATTERNS
+    # ============================================================================
+
+    # Tukey IQR multiplier for outlier detection
+    # 1.5 = standard outlier detection
+    # 3.0 = extreme outlier detection (more conservative)
+    IQR_MULTIPLIER_TUKEY = 1.5
+
+    # Running mean threshold for pattern filtering (percentage)
+    # 0.5 = keep patterns with at least 50% of the running mean onset count
+    RUNNING_MEAN_THRESHOLD = 0.5
+
+    # Threshold for choosing filtering method
+    # If patterns <= this value: use running mean method
+    # If patterns > this value: use Tukey method
+    NO_OF_REPETITIONS_TH = 2
+
+    # ============================================================================
+    # STEP 6: AUDIO EXAMPLES
+    # ============================================================================
+
+    # Audio export parameters (always WAV)
+    CLICK_TRACK_FREQUENCY = 3000  # Hz for click sound (3000 = sharp, clicky sound)
+    CLICK_TRACK_DURATION = 0.050  # 50ms click
+
+    # ============================================================================
+    # BATCH PROCESSING
+    # ============================================================================
+
+    # Track ID range for batch processing
+    USE_ID_RANGE = True
+    START_ID = 0
+    END_ID = 120
+
+    # Skip existing files
+    SKIP_EXISTING = True
+
+    # ============================================================================
+    # HELPER METHODS
+    # ============================================================================
+
+    @classmethod
+    def get_output_paths(cls, track_name: str, base_output_dir: Optional[Path] = None) -> dict:
+        """
+        Generate standardized output paths for a track.
+
+        Parameters
+        ----------
+        track_name : str
+            Name of the track (without extension)
+        base_output_dir : Path, optional
+            Base output directory. If None, uses DEFAULT_OUTPUT_DIR
+
+        Returns
+        -------
+        dict
+            Dictionary with paths for each processing step:
+            - stems_dir: Directory containing 5 stem WAV files
+            - npz_file: Mel-spectrogram NPZ file
+            - beats_file: Beat detection output
+            - corrected_downbeats_file: Corrected downbeats
+            - onsets_file: Onset detection CSV
+            - comprehensive_csv: Comprehensive phases CSV
+            - midi_dir: Directory for MIDI export
+        """
+        if base_output_dir is None:
+            base_output_dir = cls.DEFAULT_OUTPUT_DIR
+
+        track_dir = base_output_dir / track_name
+
+        midi_folder = '8_midi'
+
+        return {
+            # Step 1: Stem separation
+            'stems_dir': track_dir / '1_stems',
+            'npz_file': track_dir / '1_stems' / f'{track_name}_5stems.npz',
+
+            # Step 2: Beat detection
+            'beats_file': track_dir / '2_beats' / f'{track_name}_output.txt',
+
+            # Step 2.5: SongFormer music structure analysis
+            'songformer_dir': track_dir / '2.5_songformer_sections',
+
+            # Step 3: Corrected downbeats
+            'corrected_downbeats_file': track_dir / '3_corrected' / f'{track_name}_downbeats_corrected.txt',
+            'corrected_summary_csv': track_dir / '3_corrected' / f'{track_name}_downbeat_tempos.csv',
+            'corrected_plots_pdf': track_dir / '3_corrected' / f'{track_name}_tempo_plots.pdf',
+
+            # Step 3.5: Tempo plots
+            'tempo_plots_dir': track_dir / '3.5_tempo_plots',
+            'tempo_plots_pdf': track_dir / '3.5_tempo_plots' / f'{track_name}_tempo_plots.pdf',
+            'tempo_csv': track_dir / '3.5_tempo_plots' / f'{track_name}_bar_tempos.csv',
+
+            # Step 4: Onset detection (drums stem by default, subfolders for multi-stem)
+            'onsets_dir': track_dir / '4_onsets' / 'drums',
+            'onsets_file': track_dir / '4_onsets' / 'drums' / f'{track_name}_onsets.csv',
+
+            # Step 5: Raster/grid calculations (drums stem by default)
+            'grid_dir': track_dir / '5_grid' / 'drums',
+            'comprehensive_csv': track_dir / '5_grid' / 'drums' / f'{track_name}_comprehensive_phases.csv',
+
+            # Step 6.1: Section anchoring (drums stem by default)
+            'anchoring_dir': track_dir / cls.ANCHORING_OUTPUT_FOLDER / 'drums',
+
+            # Step 6.2/6.3: Filtered patterns (drums stem by default)
+            'filtered_patterns_dir': track_dir / '6.2_filtered_patterns' / 'drums',
+
+            # Step 8: MIDI export
+            'midi_dir': track_dir / midi_folder,
+
+            # Step 11: Drum transcription
+            'drumtranscriber_dir': track_dir / '11_drumtranscriber',
+
+            # Step 11.1: Section extraction
+            'sections_dir': track_dir / '9.1_sections',
+
+            # Step 13: Spotify analysis
+            'spotify_dir': track_dir / '13_spotify',
+        }
+
+    @classmethod
+    def get_stem_paths(cls, track_name: str, stem: str, base_output_dir: Optional[Path] = None) -> dict:
+        """
+        Generate stem-specific output paths for onset and grid analysis.
+
+        Parameters
+        ----------
+        track_name : str
+            Name of the track (without extension)
+        stem : str
+            Stem name (e.g., 'drums', 'vocals', 'bass', 'piano', 'other')
+        base_output_dir : Path, optional
+            Base output directory. If None, uses DEFAULT_OUTPUT_DIR
+
+        Returns
+        -------
+        dict
+            Dictionary with stem-specific paths:
+            - onsets_dir: Directory for onset detection
+            - onsets_file: Onset detection CSV
+            - grid_dir: Directory for grid/comprehensive phases
+            - comprehensive_csv: Comprehensive phases CSV
+            - anchoring_dir: Directory for anchoring results
+            - filtered_patterns_dir: Directory for filtered patterns
+        """
+        if base_output_dir is None:
+            base_output_dir = cls.DEFAULT_OUTPUT_DIR
+
+        track_dir = base_output_dir / track_name
+
+        return {
+            'onsets_dir': track_dir / '4_onsets' / stem,
+            'onsets_file': track_dir / '4_onsets' / stem / f'{track_name}_onsets.csv',
+            'grid_dir': track_dir / '5_grid' / stem,
+            'comprehensive_csv': track_dir / '5_grid' / stem / f'{track_name}_comprehensive_phases.csv',
+            'anchoring_dir': track_dir / cls.ANCHORING_OUTPUT_FOLDER / stem,
+            'filtered_patterns_dir': track_dir / '6.2_filtered_patterns' / stem,
+            # Downstream analysis folders (stem-specific)
+            'rhythm_histograms_dir': track_dir / '6.6_anchored_rhythm_histograms' / stem,
+            'beat_histograms_dir': track_dir / '6.7_anchored_beat_histograms' / stem,
+            'sections_dir': track_dir / '9.1_sections' / stem,
+        }
+
+    @classmethod
+    def create_output_directories(cls, track_name: str, base_output_dir: Optional[Path] = None):
+        """Create all necessary output directories for a track."""
+        paths = cls.get_output_paths(track_name, base_output_dir)
+
+        for key, path in paths.items():
+            if key == 'drumtranscriber_dir':
+                # Only used with --onset-mode drumtranscriber; created on demand
+                # by drumtranscriber_interface.transcribe_drums
+                continue
+            if key.endswith('_dir'):
+                path.mkdir(parents=True, exist_ok=True)
+            else:
+                path.parent.mkdir(parents=True, exist_ok=True)
+
+    @classmethod
+    def validate_environment(cls) -> dict:
+        """
+        Validate that all required paths and environments exist.
+
+        Returns
+        -------
+        dict
+            Validation results with 'valid' boolean and 'errors' list
+        """
+        errors = []
+
+        # Check Beat-Transformer paths
+        if not cls.BEAT_TRANSFORMER_DIR.exists():
+            errors.append(f"Beat-Transformer directory not found: {cls.BEAT_TRANSFORMER_DIR}")
+
+        if not cls.BEAT_TRANSFORMER_CHECKPOINT.exists():
+            errors.append(f"Beat-Transformer checkpoint not found: {cls.BEAT_TRANSFORMER_CHECKPOINT}")
+
+        if not cls.BEAT_TRANSFORMER_CODE.exists():
+            errors.append(f"Beat-Transformer code directory not found: {cls.BEAT_TRANSFORMER_CODE}")
+
+        # Check Python executable for beat detection
+        if not Path(cls.BEAT_DETECTION_PYTHON).exists():
+            errors.append(f"Beat detection Python not found: {cls.BEAT_DETECTION_PYTHON}")
+
+        return {
+            'valid': len(errors) == 0,
+            'errors': errors
+        }
+
+
+# Convenience instance for importing
+config = Config()

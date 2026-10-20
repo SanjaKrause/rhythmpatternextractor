@@ -1,0 +1,71 @@
+# Checkpoints and pretrained models (large files)
+*.pt
+*.safetensors
+pretrained_models/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Pipeline output (default location)
+loop_extractor/output_analysis/
+
+# Logs
+*.log
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Conda
+*.conda
+*.tar.bz2
+
+# Data folders (large datasets)
+groove-data/
+drumtranscriber/model/drum_transcriber.h5
+
+# macOS + thesis/ML artefacts (not part of the extractor)
+.DS_Store
+nested_cv_figs/
+song_corpus_numbers.md
+statistical_featureset_docu.md
+
+# DrumTranscriber (github.com/yoshi-man/DrumTranscriber) — upstream has no
+# licence, so the code is not redistributed here; see drumtranscriber/README.md
+drumtranscriber/*
+!drumtranscriber/README.md
