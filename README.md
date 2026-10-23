@@ -3,7 +3,7 @@
 Standalone rhythm pattern extraction and microtiming analysis tool
 (formerly "Loop Extractor").
 
-**Author:** Alexander Krause, TU Berlin
+**Author:** Alexander Krause, TU Berlin ([ale.krause@gmx.de](mailto:ale.krause@gmx.de))
 **Co-Author:** Claude Code (Anthropic)
 
 ## Introduction
